@@ -62,10 +62,15 @@ export default function DashboardPage() {
       setMe(meRes.data);
       setPendingRequests(pendingRes.data);
       setFriends(friendsRes.data);
-    } catch {
-      toast.error("Session expired. Please login again.");
-      clearAuth();
-      navigate("/auth", { replace: true });
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        toast.error("Session expired. Please login again.");
+        clearAuth();
+        navigate("/auth", { replace: true });
+        return;
+      }
+      toast.error("Could not load dashboard data. Check network/CORS and try again.");
     }
   }
 
