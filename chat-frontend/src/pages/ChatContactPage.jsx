@@ -9,11 +9,22 @@ export default function ChatContactPage() {
   const navigate = useNavigate();
   const friendName = state?.friendName || friendUserId;
   const [messages, setMessages] = useState([]);
-  const [previewImage, setPreviewImage] = useState(null);
-  const [previewImageItem, setPreviewImageItem] = useState(null);
+  const [previewMedia, setPreviewMedia] = useState(null);
+  const [previewMediaItem, setPreviewMediaItem] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [mediaPreviewMap, setMediaPreviewMap] = useState({});
   const mediaPreviewRef = useRef({});
+
+  function isLikelyVideoFile(name = "") {
+    const n = name.toLowerCase();
+    return (
+      n.endsWith(".mp4") ||
+      n.endsWith(".webm") ||
+      n.endsWith(".mov") ||
+      n.endsWith(".mkv") ||
+      n.endsWith(".avi")
+    );
+  }
 
   useEffect(() => {
     async function load() {
@@ -46,8 +57,12 @@ export default function ChatContactPage() {
       for (const item of mediaItems) {
         if (mediaPreviewMap[item.fileUrl]) continue;
         try {
-          const { data } = await api.get(item.fileUrl, { responseType: "blob" });
-          newEntries[item.fileUrl] = URL.createObjectURL(data);
+          const { data, headers } = await api.get(item.fileUrl, { responseType: "blob" });
+          const mimeType = headers["content-type"] || data.type || "application/octet-stream";
+          newEntries[item.fileUrl] = {
+            url: URL.createObjectURL(data),
+            mimeType,
+          };
         } catch {
           // ignore one-off image failures
         }
@@ -61,7 +76,7 @@ export default function ChatContactPage() {
 
   useEffect(() => {
     return () => {
-      Object.values(mediaPreviewRef.current).forEach((url) => URL.revokeObjectURL(url));
+      Object.values(mediaPreviewRef.current).forEach((file) => URL.revokeObjectURL(file.url));
     };
   }, []);
 
@@ -88,9 +103,12 @@ export default function ChatContactPage() {
     try {
       const { data } = await api.get(item.fileUrl, { responseType: "blob" });
       const blobUrl = URL.createObjectURL(data);
-      if (mode === "preview-image") {
-        setPreviewImage(blobUrl);
-        setPreviewImageItem(item);
+      if (mode === "preview-media") {
+        setPreviewMedia({
+          url: blobUrl,
+          mimeType: data.type || "application/octet-stream",
+        });
+        setPreviewMediaItem(item);
         return;
       }
       if (mode === "download") {
@@ -129,21 +147,30 @@ export default function ChatContactPage() {
 
         <section className="panel-card mb-3">
           <h3 className="h4 mb-3">Media</h3>
-          {mediaItems.length === 0 && <p className="text-secondary mb-0">No uploaded images yet.</p>}
+          {mediaItems.length === 0 && <p className="text-secondary mb-0">No uploaded media yet.</p>}
           <div className="media-grid-3">
             {mediaItems.map((item) => (
               <button
                 key={item.id}
                 className="image-thumb-btn"
                 type="button"
-                onClick={() => openAttachment(item, "preview-image")}
+                onClick={() => openAttachment(item, "preview-media")}
               >
-                {mediaPreviewMap[item.fileUrl] ? (
-                  <img
-                    src={mediaPreviewMap[item.fileUrl]}
-                    alt={item.content || "image"}
-                    className="image-thumb-square"
-                  />
+                {mediaPreviewMap[item.fileUrl]?.url ? (
+                  mediaPreviewMap[item.fileUrl]?.mimeType?.startsWith("video/") || isLikelyVideoFile(item.content || "") ? (
+                    <video
+                      src={mediaPreviewMap[item.fileUrl].url}
+                      className="image-thumb-square"
+                      muted
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={mediaPreviewMap[item.fileUrl].url}
+                      alt={item.content || "image"}
+                      className="image-thumb-square"
+                    />
+                  )
                 ) : (
                   <div className="image-thumb-square d-flex align-items-center justify-content-center text-secondary small">
                     Loading...
@@ -175,32 +202,36 @@ export default function ChatContactPage() {
         </section>
       </div>
 
-      {previewImage && (
+      {previewMedia?.url && (
         <div
           className="image-preview-overlay"
           onClick={() => {
-            setPreviewImage(null);
-            setPreviewImageItem(null);
+            setPreviewMedia(null);
+            setPreviewMediaItem(null);
           }}
         >
           <div className="image-preview-card" onClick={(e) => e.stopPropagation()}>
             <div className="d-flex justify-content-end gap-2 mb-2">
-              {previewImageItem && (
-                <button className="btn btn-sm btn-primary" onClick={() => openAttachment(previewImageItem, "download")}>
+              {previewMediaItem && (
+                <button className="btn btn-sm btn-primary" onClick={() => openAttachment(previewMediaItem, "download")}>
                   Download
                 </button>
               )}
               <button
                 className="btn btn-sm btn-outline-secondary"
                 onClick={() => {
-                  setPreviewImage(null);
-                  setPreviewImageItem(null);
+                  setPreviewMedia(null);
+                  setPreviewMediaItem(null);
                 }}
               >
                 Close
               </button>
             </div>
-            <img src={previewImage} alt="media preview" className="image-preview-full" />
+            {previewMedia.mimeType?.startsWith("video/") || isLikelyVideoFile(previewMediaItem?.content || "") ? (
+              <video className="w-100" controls src={previewMedia.url} />
+            ) : (
+              <img src={previewMedia.url} alt="media preview" className="image-preview-full" />
+            )}
           </div>
         </div>
       )}

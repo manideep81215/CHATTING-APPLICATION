@@ -194,6 +194,26 @@ export default function ChatPage() {
     return "image/jpeg";
   }
 
+  function guessVideoMime(fileName = "") {
+    const n = fileName.toLowerCase();
+    if (n.endsWith(".webm")) return "video/webm";
+    if (n.endsWith(".mov")) return "video/quicktime";
+    if (n.endsWith(".mkv")) return "video/x-matroska";
+    if (n.endsWith(".avi")) return "video/x-msvideo";
+    return "video/mp4";
+  }
+
+  function isLikelyVideoFile(name = "") {
+    const n = name.toLowerCase();
+    return (
+      n.endsWith(".mp4") ||
+      n.endsWith(".webm") ||
+      n.endsWith(".mov") ||
+      n.endsWith(".mkv") ||
+      n.endsWith(".avi")
+    );
+  }
+
   function guessAudioMime(fileName = "") {
     const n = fileName.toLowerCase();
     if (n.endsWith(".webm")) return "audio/webm";
@@ -212,7 +232,7 @@ export default function ChatPage() {
     let mimeType = rawMime;
 
     if ((!rawMime || rawMime === "application/octet-stream") && messageType === "IMAGE") {
-      mimeType = guessImageMime(fileName);
+      mimeType = isLikelyVideoFile(fileName) ? guessVideoMime(fileName) : guessImageMime(fileName);
       effectiveBlob = new Blob([data], { type: mimeType });
     } else if ((!rawMime || rawMime === "application/octet-stream") && messageType === "VOICE") {
       mimeType = guessAudioMime(fileName);
@@ -265,7 +285,12 @@ export default function ChatPage() {
   }
 
   function attachmentLabel(message) {
-    if (message.type === "IMAGE") return "Image";
+    if (message.type === "IMAGE") {
+      if (attachmentMap[message.fileUrl]?.mimeType?.startsWith("video/") || isLikelyVideoFile(message.content || "")) {
+        return "Video";
+      }
+      return "Image";
+    }
     if (message.type === "VOICE") return "Voice Note";
     return "File";
   }
@@ -500,11 +525,20 @@ export default function ChatPage() {
                       ) : msg.type === "IMAGE" ? (
                         <button type="button" className="image-thumb-btn" onClick={() => openImagePreview(msg)}>
                           {attachmentMap[msg.fileUrl]?.url ? (
-                            <img
-                              src={attachmentMap[msg.fileUrl].url}
-                              alt={msg.content || "Image"}
-                              className="image-thumb-3x4"
-                            />
+                            attachmentMap[msg.fileUrl]?.mimeType?.startsWith("video/") || isLikelyVideoFile(msg.content || "") ? (
+                              <video
+                                src={attachmentMap[msg.fileUrl].url}
+                                className="image-thumb-3x4"
+                                muted
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={attachmentMap[msg.fileUrl].url}
+                                alt={msg.content || "Image"}
+                                className="image-thumb-3x4"
+                              />
+                            )
                           ) : (
                             <span className="small">Loading preview...</span>
                           )}
@@ -532,12 +566,12 @@ export default function ChatPage() {
       <footer className="bg-white border-top p-3 chat-bottom-nav">
         <div className="mx-auto message-wrap composer-box">
           <div className="composer-row">
-            <label className="attach-chip" title="Image">
+            <label className="attach-chip" title="Image/Video">
               🖼
               <input
                 hidden
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={(e) => e.target.files?.[0] && uploadAndSend(e.target.files[0], "IMAGE")}
               />
             </label>
