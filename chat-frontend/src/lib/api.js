@@ -1,8 +1,11 @@
 import axios from "axios";
 import { getToken } from "./auth";
 
+const defaultApiBaseUrl = "https://chatting-application-d96r.onrender.com";
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl).trim().replace(/\/+$/, "");
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "",
+  baseURL: apiBaseUrl,
 });
 
 api.interceptors.request.use((config) => {

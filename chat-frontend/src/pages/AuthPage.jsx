@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { api } from "../lib/api";
-import { setAuth } from "../lib/auth";
+import { getToken, setAuth } from "../lib/auth";
 
 const initialRegister = {
   username: "",
@@ -23,6 +23,20 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  function redirectToDashboard() {
+    const isNativeWebView =
+      typeof window !== "undefined" &&
+      (window.location.protocol === "capacitor:" ||
+        window.location.protocol === "file:" ||
+        (window.location.hostname === "localhost" && !window.location.port));
+
+    if (isNativeWebView) {
+      window.location.hash = "#/dashboard";
+      return;
+    }
+    navigate("/dashboard", { replace: true });
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true);
@@ -31,15 +45,22 @@ export default function AuthPage() {
       const payload = isLogin ? loginForm : registerForm;
       const { data } = await api.post(endpoint, payload);
       setAuth(data);
+      if (!getToken()) {
+        toast.error("Login response did not include a token.");
+        return;
+      }
       toast.success(isLogin ? "Login successful" : "Account created");
-      navigate("/dashboard", { replace: true });
+      redirectToDashboard();
     } catch (error) {
       const data = error.response?.data;
+      const status = error?.response?.status;
       const message =
         data?.message ||
         (typeof data === "string" && data) ||
         data?.error ||
-        "Authentication failed";
+        (status
+          ? `Authentication failed (${status})`
+          : "Authentication failed (network/CORS).");
       toast.error(message);
     } finally {
       setLoading(false);

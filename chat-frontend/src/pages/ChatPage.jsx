@@ -33,7 +33,9 @@ export default function ChatPage() {
   const recordTimerRef = useRef(null);
   const recordStreamRef = useRef(null);
   const friendName = state?.friendName || friendUserId;
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/+$/, "");
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "https://chatting-application-d96r.onrender.com")
+    .trim()
+    .replace(/\/+$/, "");
   const wsUrl = import.meta.env.VITE_WS_URL || (apiBaseUrl ? `${apiBaseUrl}/ws` : "/ws");
 
   const sortedMessages = useMemo(
